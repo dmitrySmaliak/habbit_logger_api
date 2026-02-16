@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Enums\GenderEnum;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Tymon\JWTAuth\Contracts\JWTSubject;
 
-class User extends Authenticatable
+class User extends Authenticatable implements JWTSubject
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory;
@@ -20,7 +22,12 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'name',
+        'gender',
+        'birth_date',
+        'hobby',
         'email',
+        'social_provider',
+        'social_id',
         'password',
     ];
 
@@ -34,6 +41,19 @@ class User extends Authenticatable
         'remember_token',
     ];
 
+    public function getJWTIdentifier(): mixed
+    {
+        return $this->getKey();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getJWTCustomClaims(): array
+    {
+        return [];
+    }
+
     /**
      * Get the attributes that should be cast.
      *
@@ -42,6 +62,8 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
+            'gender' => GenderEnum::class,
+            'birth_date' => 'date',
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
