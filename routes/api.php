@@ -9,11 +9,13 @@ Route::prefix('auth')->name('auth.')->controller(AuthController::class)->group(f
     Route::post('login', 'login')->name('login');
     Route::post('register', 'register')->name('register');
 
-    Route::middleware('auth:api')->group(function (): void {
+    Route::middleware('auth')->group(function (): void {
         Route::post('refresh', 'refresh')->name('refresh');
         Route::post('logout', 'logout')->name('logout');
         Route::get('profile', 'profile')->name('profile');
     });
 });
 
-Route::resource('activities', ActivityController::class)->only(['index']);
+Route::group(['middleware' => ['jwt.auth']], function () {
+    Route::resource('activities', ActivityController::class)->only(['index']);
+});
