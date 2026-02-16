@@ -8,6 +8,8 @@ jobs:
   on-pr-open:
     if: github.event.action != 'closed'
     runs-on: ubuntu-latest
+    env:
+      HAS_PROJECTS_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
     permissions:
       contents: read
       issues: read
@@ -50,9 +52,10 @@ jobs:
             core.info(`Added '${suffix}' to PR body.`);
 
       - name: Move issue to In Review
+        if: env.HAS_PROJECTS_TOKEN != ''
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.PROJECTS_TOKEN || github.token }}
+          github-token: ${{ secrets.PROJECTS_TOKEN }}
           script: |
             const branchName = context.payload.pull_request.head.ref;
             const match = branchName.match(/^(feat|fix)\/HL-(\d+)$/);
@@ -185,18 +188,25 @@ jobs:
           PROJECT_STATUS_FIELD_ID: ${{ vars.PROJECT_STATUS_FIELD_ID }}
           PROJECT_STATUS_IN_REVIEW_OPTION_ID: ${{ vars.PROJECT_STATUS_IN_REVIEW_OPTION_ID }}
 
+      - name: Skip In Review move (no PROJECTS_TOKEN)
+        if: env.HAS_PROJECTS_TOKEN == ''
+        run: echo "PROJECTS_TOKEN is not set, skipping GitHub Project status update."
+
   on-pr-merged:
     if: github.event.action == 'closed' && github.event.pull_request.merged == true
     runs-on: ubuntu-latest
+    env:
+      HAS_PROJECTS_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
     permissions:
       contents: read
       issues: read
       repository-projects: write
     steps:
       - name: Move issue to Done
+        if: env.HAS_PROJECTS_TOKEN != ''
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.PROJECTS_TOKEN || github.token }}
+          github-token: ${{ secrets.PROJECTS_TOKEN }}
           script: |
             const branchName = context.payload.pull_request.head.ref;
             const match = branchName.match(/^(feat|fix)\/HL-(\d+)$/);
@@ -328,3 +338,7 @@ jobs:
           PROJECT_ID: ${{ vars.PROJECT_ID }}
           PROJECT_STATUS_FIELD_ID: ${{ vars.PROJECT_STATUS_FIELD_ID }}
           PROJECT_STATUS_DONE_OPTION_ID: ${{ vars.PROJECT_STATUS_DONE_OPTION_ID }}
+
+      - name: Skip Done move (no PROJECTS_TOKEN)
+        if: env.HAS_PROJECTS_TOKEN == ''
+        run: echo "PROJECTS_TOKEN is not set, skipping GitHub Project status update."
