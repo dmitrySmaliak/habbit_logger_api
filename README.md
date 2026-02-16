@@ -58,3 +58,28 @@ phpMyAdmin credentials:
 1. Add closing keyword to auto-close ticket when PR is merged.
 2. Format: `Closes #<number>`
 3. Example: `Closes #123`
+
+## 5. PR/Issue Automation
+Repository contains workflow `.github/workflows/pr-issue-automation.yml`:
+1. On PR open/reopen/sync:
+   Adds `Closes #<number>` to PR body (for `feat/HL-<number>` and `fix/HL-<number>` branches).
+2. On PR open/reopen/sync:
+   Moves linked issue to `In Review` in GitHub Project.
+3. On merged PR:
+   Moves linked issue to `Done` in GitHub Project.
+
+### Required Repository Variables
+Set in `Settings -> Secrets and variables -> Actions -> Variables`:
+1. `PROJECT_ID`
+2. `PROJECT_STATUS_FIELD_ID`
+3. `PROJECT_STATUS_IN_REVIEW_OPTION_ID`
+4. `PROJECT_STATUS_DONE_OPTION_ID`
+
+### Optional Repository Secret
+If default `GITHUB_TOKEN` cannot update your Project, add PAT in
+`Settings -> Secrets and variables -> Actions -> Secrets`:
+1. `PROJECTS_TOKEN`
+
+PAT must have access to:
+1. Repository (read/write as needed for Actions API calls)
+2. Projects (read/write to update item status)
