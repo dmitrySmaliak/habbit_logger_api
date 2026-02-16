@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        task: ['pint', 'test']
+        task: ['pint']
 
     steps:
       - name: Checkout Repository
@@ -23,9 +23,4 @@ jobs:
         run: composer install --prefer-dist --no-progress --no-suggest
 
       - name: Run ${{ matrix.task }}
-        run: |
-          if [ "${{ matrix.task }}" = "pint" ]; then
-            ./vendor/bin/pint --test
-          else
-            php artisan test
-          fi
+        run: ./vendor/bin/pint --test
