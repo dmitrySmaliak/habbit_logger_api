@@ -1,0 +1,344 @@
+name: PR Issue Automation
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, edited, ready_for_review, closed]
+
+jobs:
+  on-pr-open:
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    env:
+      HAS_PROJECTS_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: write
+      repository-projects: write
+    steps:
+      - name: Append Closes to PR body
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const branchName = context.payload.pull_request.head.ref;
+            const match = branchName.match(/^(feat|fix)\/HL-(\d+)$/);
+
+            if (!match) {
+              core.info(`Branch '${branchName}' is not feat/fix HL pattern. Skipping.`);
+              return;
+            }
+
+            const issueNumber = match[2];
+            const pr = context.payload.pull_request;
+            const body = pr.body || "";
+            const closesRegex = new RegExp(`\\b(close[sd]?|fix(e[sd])?|resolve[sd]?)\\s+#${issueNumber}\\b`, "i");
+
+            if (closesRegex.test(body)) {
+              core.info(`PR body already references issue #${issueNumber}.`);
+              return;
+            }
+
+            const trimmedBody = body.trim();
+            const suffix = `Closes #${issueNumber}`;
+            const nextBody = trimmedBody ? `${trimmedBody}\n\n${suffix}` : suffix;
+
+            await github.rest.pulls.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              body: nextBody,
+            });
+
+            core.info(`Added '${suffix}' to PR body.`);
+
+      - name: Move issue to In Review
+        if: env.HAS_PROJECTS_TOKEN != ''
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.PROJECTS_TOKEN }}
+          script: |
+            const branchName = context.payload.pull_request.head.ref;
+            const match = branchName.match(/^(feat|fix)\/HL-(\d+)$/);
+
+            if (!match) {
+              core.info(`Branch '${branchName}' is not feat/fix HL pattern. Skipping.`);
+              return;
+            }
+
+            const projectId = process.env.PROJECT_ID;
+            const statusFieldId = process.env.PROJECT_STATUS_FIELD_ID;
+            const inReviewOptionId = process.env.PROJECT_STATUS_IN_REVIEW_OPTION_ID;
+
+            if (!projectId || !statusFieldId || !inReviewOptionId) {
+              core.warning("Project variables are not configured. Skipping status update.");
+              return;
+            }
+
+            const issueNumber = Number(match[2]);
+            const issueResp = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+            });
+
+            const issueNodeId = issueResp.data.node_id;
+            let itemId = null;
+            let cursor = null;
+
+            const listItemsQuery = `
+              query($projectId: ID!, $cursor: String) {
+                node(id: $projectId) {
+                  ... on ProjectV2 {
+                    items(first: 100, after: $cursor) {
+                      nodes {
+                        id
+                        content {
+                          ... on Issue {
+                            id
+                          }
+                        }
+                      }
+                      pageInfo {
+                        hasNextPage
+                        endCursor
+                      }
+                    }
+                  }
+                }
+              }
+            `;
+
+            while (true) {
+              const result = await github.graphql(listItemsQuery, {
+                projectId,
+                cursor,
+              });
+
+              const projectNode = result.node;
+              if (!projectNode) {
+                core.setFailed("Project not found. Check PROJECT_ID.");
+                return;
+              }
+
+              const items = projectNode.items.nodes || [];
+              for (const item of items) {
+                if (item.content && item.content.id === issueNodeId) {
+                  itemId = item.id;
+                  break;
+                }
+              }
+
+              if (itemId) {
+                break;
+              }
+
+              const pageInfo = projectNode.items.pageInfo;
+              if (!pageInfo.hasNextPage) {
+                break;
+              }
+
+              cursor = pageInfo.endCursor;
+            }
+
+            if (!itemId) {
+              const addItemMutation = `
+                mutation($projectId: ID!, $contentId: ID!) {
+                  addProjectV2ItemById(input: { projectId: $projectId, contentId: $contentId }) {
+                    item {
+                      id
+                    }
+                  }
+                }
+              `;
+
+              const addResult = await github.graphql(addItemMutation, {
+                projectId,
+                contentId: issueNodeId,
+              });
+              itemId = addResult.addProjectV2ItemById.item.id;
+            }
+
+            const updateMutation = `
+              mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+                updateProjectV2ItemFieldValue(
+                  input: {
+                    projectId: $projectId
+                    itemId: $itemId
+                    fieldId: $fieldId
+                    value: { singleSelectOptionId: $optionId }
+                  }
+                ) {
+                  projectV2Item {
+                    id
+                  }
+                }
+              }
+            `;
+
+            await github.graphql(updateMutation, {
+              projectId,
+              itemId,
+              fieldId: statusFieldId,
+              optionId: inReviewOptionId,
+            });
+
+            core.info(`Moved issue #${issueNumber} to In Review.`);
+        env:
+          PROJECT_ID: ${{ vars.PROJECT_ID }}
+          PROJECT_STATUS_FIELD_ID: ${{ vars.PROJECT_STATUS_FIELD_ID }}
+          PROJECT_STATUS_IN_REVIEW_OPTION_ID: ${{ vars.PROJECT_STATUS_IN_REVIEW_OPTION_ID }}
+
+      - name: Skip In Review move (no PROJECTS_TOKEN)
+        if: env.HAS_PROJECTS_TOKEN == ''
+        run: echo "PROJECTS_TOKEN is not set, skipping GitHub Project status update."
+
+  on-pr-merged:
+    if: github.event.action == 'closed' && github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    env:
+      HAS_PROJECTS_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+    permissions:
+      contents: read
+      issues: read
+      repository-projects: write
+    steps:
+      - name: Move issue to Done
+        if: env.HAS_PROJECTS_TOKEN != ''
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.PROJECTS_TOKEN }}
+          script: |
+            const branchName = context.payload.pull_request.head.ref;
+            const match = branchName.match(/^(feat|fix)\/HL-(\d+)$/);
+
+            if (!match) {
+              core.info(`Branch '${branchName}' is not feat/fix HL pattern. Skipping.`);
+              return;
+            }
+
+            const projectId = process.env.PROJECT_ID;
+            const statusFieldId = process.env.PROJECT_STATUS_FIELD_ID;
+            const doneOptionId = process.env.PROJECT_STATUS_DONE_OPTION_ID;
+
+            if (!projectId || !statusFieldId || !doneOptionId) {
+              core.warning("Project variables are not configured. Skipping status update.");
+              return;
+            }
+
+            const issueNumber = Number(match[2]);
+            const issueResp = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+            });
+
+            const issueNodeId = issueResp.data.node_id;
+            let itemId = null;
+            let cursor = null;
+
+            const listItemsQuery = `
+              query($projectId: ID!, $cursor: String) {
+                node(id: $projectId) {
+                  ... on ProjectV2 {
+                    items(first: 100, after: $cursor) {
+                      nodes {
+                        id
+                        content {
+                          ... on Issue {
+                            id
+                          }
+                        }
+                      }
+                      pageInfo {
+                        hasNextPage
+                        endCursor
+                      }
+                    }
+                  }
+                }
+              }
+            `;
+
+            while (true) {
+              const result = await github.graphql(listItemsQuery, {
+                projectId,
+                cursor,
+              });
+
+              const projectNode = result.node;
+              if (!projectNode) {
+                core.setFailed("Project not found. Check PROJECT_ID.");
+                return;
+              }
+
+              const items = projectNode.items.nodes || [];
+              for (const item of items) {
+                if (item.content && item.content.id === issueNodeId) {
+                  itemId = item.id;
+                  break;
+                }
+              }
+
+              if (itemId) {
+                break;
+              }
+
+              const pageInfo = projectNode.items.pageInfo;
+              if (!pageInfo.hasNextPage) {
+                break;
+              }
+
+              cursor = pageInfo.endCursor;
+            }
+
+            if (!itemId) {
+              const addItemMutation = `
+                mutation($projectId: ID!, $contentId: ID!) {
+                  addProjectV2ItemById(input: { projectId: $projectId, contentId: $contentId }) {
+                    item {
+                      id
+                    }
+                  }
+                }
+              `;
+
+              const addResult = await github.graphql(addItemMutation, {
+                projectId,
+                contentId: issueNodeId,
+              });
+              itemId = addResult.addProjectV2ItemById.item.id;
+            }
+
+            const updateMutation = `
+              mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+                updateProjectV2ItemFieldValue(
+                  input: {
+                    projectId: $projectId
+                    itemId: $itemId
+                    fieldId: $fieldId
+                    value: { singleSelectOptionId: $optionId }
+                  }
+                ) {
+                  projectV2Item {
+                    id
+                  }
+                }
+              }
+            `;
+
+            await github.graphql(updateMutation, {
+              projectId,
+              itemId,
+              fieldId: statusFieldId,
+              optionId: doneOptionId,
+            });
+
+            core.info(`Moved issue #${issueNumber} to Done.`);
+        env:
+          PROJECT_ID: ${{ vars.PROJECT_ID }}
+          PROJECT_STATUS_FIELD_ID: ${{ vars.PROJECT_STATUS_FIELD_ID }}
+          PROJECT_STATUS_DONE_OPTION_ID: ${{ vars.PROJECT_STATUS_DONE_OPTION_ID }}
+
+      - name: Skip Done move (no PROJECTS_TOKEN)
+        if: env.HAS_PROJECTS_TOKEN == ''
+        run: echo "PROJECTS_TOKEN is not set, skipping GitHub Project status update."
