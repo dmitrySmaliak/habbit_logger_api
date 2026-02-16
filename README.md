@@ -32,24 +32,29 @@ phpMyAdmin credentials:
 - Release branch: `release/dd.mm.yy-vx.y.z` (example: `release/16.02.26-v1.3.0`)
 
 ### Commit Message
-- For `feat/HL-<number>` and `fix/HL-<number>` branches, each commit must start with:
-  - `HL-<number>.`
-  - example for `feat/HL-123`: `HL-123. Add habit streak endpoint`
-- For `hotfix/*` branches, each commit must start with:
-  - `hotfix.`
-  - example: `hotfix. Fix production token validation`
-- For `release/*` branches, commit message check is skipped.
+1. For `feat/HL-<number>` and `fix/HL-<number>` branches:
+   Format: `HL-#<number>. <description>`
+   Example: `HL-#123. Add habit streak endpoint`
+2. For `hotfix/*` branches:
+   Format: `hotfix. <description>`
+   Example: `hotfix. Fix production token validation`
+3. For `release/*` branches, commit message check is skipped.
 
 ### Pull Request Title
-- For `feat/HL-<number>` branch:
-  - `Feat/HL-<number>. <short description>`
-  - example: `Feat/HL-123. Add habit streak endpoint`
-- For `fix/HL-<number>` branch:
-  - `Fix/HL-<number>. <short description>`
-  - example: `Fix/HL-456. Fix habit archive validation`
-- For `hotfix/*` branch:
-  - `Hotfix. <short description>`
-  - example: `Hotfix. Fix production token validation`
-- For `release/dd.mm.yy-vx.y.z` branch:
-  - `Release/dd.mm.yy-vx.y.z`
-  - example: `Release/16.02.26-v1.3.0`
+1. For `feat/HL-<number>` branch:
+   Format: `Feat/HL-#<number>. <short description>`
+   Example: `Feat/HL-#123. Add habit streak endpoint`
+2. For `fix/HL-<number>` branch:
+   Format: `Fix/HL-#<number>. <short description>`
+   Example: `Fix/HL-#456. Fix habit archive validation`
+3. For `hotfix/*` branch:
+   Format: `Hotfix. <short description>`
+   Example: `Hotfix. Fix production token validation`
+4. For `release/dd.mm.yy-vx.y.z` branch:
+   Format: `Release/dd.mm.yy-vx.y.z`
+   Example: `Release/16.02.26-v1.3.0`
+
+### PR Body (recommended)
+1. Add closing keyword to auto-close ticket when PR is merged.
+2. Format: `Closes #<number>`
+3. Example: `Closes #123`
