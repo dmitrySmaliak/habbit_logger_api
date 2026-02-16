@@ -1,5 +1,5 @@
 init:  docker-up app-init
-start: docker-up app-start
+start: docker-up
 restart: docker-down docker-up
 build: docker-build
 down: docker-down
@@ -8,9 +8,6 @@ rollback: app-rollback
 
 docker-up:
 	docker-compose up -d
-
-app-start:
-	docker-compose exec node npm run dev
 
 docker-build:
 	docker-compose exec php-fpm composer install
@@ -25,7 +22,6 @@ app-init:
 	docker-compose exec php-fpm php artisan key:generate
 	docker-compose exec php-fpm php artisan migrate
 	docker-compose exec php-fpm php artisan storage:link
-	docker-compose exec node npm install
 	docker-compose restart
 
 app-migrate:
@@ -42,13 +38,6 @@ php-bash:
 
 php-lint:
 	docker-compose exec php-fpm vendor/bin/pint
-
-node-bash:
-	docker-compose exec node bash
-
-node-lint:
-	docker-compose exec node npm run lint
-	docker-compose exec node npm run ts:check
 
 permissions:
 	sudo chown -R $$USER:www-data storage

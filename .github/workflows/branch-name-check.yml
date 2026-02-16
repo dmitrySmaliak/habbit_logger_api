@@ -21,8 +21,8 @@ jobs:
               exit 1
             fi
           else
-            if ! [[ "$branch_name" =~ ^(feat/DLR-[0-9]+|fix/DLR-[0-9]+|hotfix/.*)$ ]]; then
-              echo "Branch name must start with 'feat/DLR-', 'fix/DLR-', or 'hotfix/'"
+            if ! [[ "$branch_name" =~ ^(feat/HL-[0-9]+|fix/HL-[0-9]+|hotfix/.*)$ ]]; then
+              echo "Branch name must start with 'feat/HL-', 'fix/HL-', or 'hotfix/'"
               exit 1
             fi
           fi
