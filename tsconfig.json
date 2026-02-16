@@ -1,0 +1,19 @@
+{
+    "compilerOptions": {
+        "target": "ESNext",
+        "module": "ESNext",
+        "moduleResolution": "Node",
+        "jsx": "react-jsx",
+        "strict": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "noEmit": true,
+        "baseUrl": "./resources/js",
+        "paths": {
+            "~/*": ["*"]
+        }
+    },
+    "include": ["resources/js"],
+    "exclude": ["node_modules", "dist", "public"]
+}

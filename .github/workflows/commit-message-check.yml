@@ -1,0 +1,56 @@
+name: Commit Message Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  check-commit-message:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Important to fetch all commits
+
+      - name: Check Commit Messages
+        run: |
+          branch_name="${{ github.head_ref }}"
+          if [[ "$branch_name" =~ ^(feat|fix)/DLR-([0-9]+) ]]; then
+            prefix="DLR-${BASH_REMATCH[2]}."
+          elif [[ "$branch_name" =~ ^hotfix ]]; then
+            prefix="hotfix."
+          elif [[ "$branch_name" =~ ^release/[0-3][0-9]\.[0-1][0-9]\.[0-9]{2}-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release branch detected. Skipping commit message check."
+            exit 0
+          else
+            echo "Branch name does not follow the required pattern."
+            exit 1
+          fi
+
+          # Get all commit messages for commits in the PR
+          commit_messages=$(git log --format=%B origin/${{ github.base_ref }}..origin/${{ github.head_ref }})
+          echo "Commit messages:"
+          echo "$commit_messages"
+
+          # Check each commit message
+          while IFS= read -r line; do
+            # Trim leading/trailing whitespace
+            line=$(echo "$line" | xargs)
+
+            # Skip empty lines
+            if [[ -z "$line" ]]; then
+              continue
+            fi
+
+            # Exclude merge commits
+            if [[ "$line" =~ ^Merge ]]; then
+              continue
+            fi
+
+            # Check the format of the commit message
+            if ! [[ "$line" =~ ^$prefix ]]; then
+              echo "Commit message does not meet the required format for the branch $branch_name: $line"
+              exit 1
+            fi
+          done <<< "$commit_messages"
