@@ -15,13 +15,17 @@ return new class() extends Migration {
             $table->id();
             $table->string('name');
             $table->enum('gender', GenderEnum::values());
-            $table->date('birth_date');
+            $table->date('birth_date')->nullable();
             $table->string('hobby')->nullable();
             $table->string('email')->unique();
+            $table->string('social_provider')->nullable();
+            $table->string('social_id')->nullable();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             $table->rememberToken();
             $table->timestamps();
+
+            $table->unique(['social_provider', 'social_id']);
         });
 
         Schema::create('password_reset_tokens', function (Blueprint $table) {
